@@ -16,7 +16,7 @@ import 'views/splash/splash_view.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  GoogleFonts.config.allowRuntimeFetching = false;
+  GoogleFonts.config.allowRuntimeFetching = true;
 
   runApp(
     MultiProvider(
@@ -56,3 +56,4 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+

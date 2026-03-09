@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "1056677091119",
+    "firebase_url": "https://reviewcoffe-default-rtdb.firebaseio.com",
+    "project_id": "reviewcoffe",
+    "storage_bucket": "reviewcoffe.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1056677091119:android:462fdc2d4512f433b1b3da",
+        "android_client_info": {
+          "package_name": "com.example.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCLOsgQGTxgG3zaJPWZx2bjCWKrPHFsjPQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
