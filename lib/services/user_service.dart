@@ -103,4 +103,31 @@ class UserService {
       throw Exception('Không thể cập nhật danh sách địa điểm đã lưu');
     }
   }
+
+  Future<bool> isPostSaved(String uid, String postId) async {
+    try {
+      final doc = await _db.collection(_collection).doc(uid).get();
+      final data = doc.data();
+      if (data == null) return false;
+      final saved = List<String>.from(data['savedPostIds'] ?? const []);
+      return saved.contains(postId);
+    } catch (e) {
+      print('IsPostSaved Error: $e');
+      return false;
+    }
+  }
+
+  Future<void> toggleSavedPost(String uid, String postId, bool shouldSave) async {
+    try {
+      await _db.collection(_collection).doc(uid).set({
+        'savedPostIds': shouldSave
+            ? FieldValue.arrayUnion([postId])
+            : FieldValue.arrayRemove([postId]),
+        'updatedAt': DateTime.now().toIso8601String(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      print('ToggleSavedPost Error: $e');
+      throw Exception('Không thể cập nhật bài viết đã lưu');
+    }
+  }
 }

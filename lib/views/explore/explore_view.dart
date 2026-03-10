@@ -196,6 +196,7 @@ class _ExploreViewState extends State<ExploreView> {
                       final place = placesById[post.venueId];
 
                       return ExplorePostFeedCard(
+                        key: ValueKey(post.id),
                         post: post,
                         place: place,
                         onOpenPlace: place == null
@@ -363,5 +364,6 @@ class _RetryView extends StatelessWidget {
     );
   }
 }
+
 
 

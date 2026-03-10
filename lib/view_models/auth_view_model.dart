@@ -43,8 +43,9 @@ class AuthViewModel extends ChangeNotifier {
       }
       _setLoading(false);
       return null;
-    } catch (e) {
-      debugPrint('Login Error: $e'); // In ra lỗi thưc tế để debug
+    } catch (e, stackTrace) {
+      debugPrint('Login Error: $e');
+      debugPrint('Stack Trace: $stackTrace');
       // Xử lý một số thông báo lỗi thân thiện hơn
       if (e is FirebaseAuthException) {
         if (e.code == 'user-not-found' || e.code == 'invalid-credential') {

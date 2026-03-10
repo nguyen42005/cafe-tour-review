@@ -92,6 +92,7 @@ class _Chip extends StatelessWidget {
           ),
         ),
         selectedColor: AppColors.primary,
+        showCheckmark: false,
         backgroundColor: AppColors.primary.withOpacity(0.12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
         side: BorderSide.none,
@@ -99,3 +100,4 @@ class _Chip extends StatelessWidget {
     );
   }
 }
+

@@ -31,7 +31,7 @@ class _MainViewState extends State<MainView> {
       backgroundColor: AppColors.backgroundLight,
       body: _pages[_currentIndex],
       // Giữa thân fab và thanh tab
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButtonLocation: const _FixedCenterDockedFabLocation(),
       floatingActionButton: Container(
         margin: const EdgeInsets.only(top: 30),
         decoration: BoxDecoration(
@@ -137,5 +137,21 @@ class CustomBottomNavBar extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _FixedCenterDockedFabLocation extends FloatingActionButtonLocation {
+  const _FixedCenterDockedFabLocation();
+
+  @override
+  Offset getOffset(ScaffoldPrelayoutGeometry scaffoldGeometry) {
+    final double fabX =
+        (scaffoldGeometry.scaffoldSize.width -
+            scaffoldGeometry.floatingActionButtonSize.width) /
+        2.0;
+    final double contentBottom = scaffoldGeometry.contentBottom;
+    final double fabHeight = scaffoldGeometry.floatingActionButtonSize.height;
+    final double fabY = contentBottom - fabHeight / 2.0;
+    return Offset(fabX, fabY);
   }
 }

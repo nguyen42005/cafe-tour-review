@@ -1,4 +1,5 @@
 ﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/post_comment_model.dart';
 import '../models/post_model.dart';
 
 class PostPageResult {
@@ -17,9 +18,24 @@ class PostService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final String _collection = 'posts';
 
+  CollectionReference<Map<String, dynamic>> _postsRef() =>
+      _db.collection(_collection);
+
+  CollectionReference<Map<String, dynamic>> _likesRef(String postId) =>
+      _postsRef().doc(postId).collection('likes');
+
+  CollectionReference<Map<String, dynamic>> _commentsRef(String postId) =>
+      _postsRef().doc(postId).collection('comments');
+
+  CollectionReference<Map<String, dynamic>> _commentLikesRef(
+    String postId,
+    String commentId,
+  ) =>
+      _commentsRef(postId).doc(commentId).collection('likes');
+
   Future<String> createPost(PostModel post) async {
     try {
-      final docRef = await _db.collection(_collection).add(post.toJson());
+      final docRef = await _postsRef().add(post.toJson());
       return docRef.id;
     } catch (e) {
       print('CreatePost Error: $e');
@@ -28,7 +44,7 @@ class PostService {
   }
 
   Stream<List<PostModel>> getPosts({String? userId}) {
-    Query query = _db.collection(_collection).orderBy('createdAt', descending: true);
+    Query query = _postsRef().orderBy('createdAt', descending: true);
 
     if (userId != null) {
       query = query.where('userId', isEqualTo: userId);
@@ -45,8 +61,7 @@ class PostService {
     DocumentSnapshot<Map<String, dynamic>>? lastDocument,
     int limit = 10,
   }) async {
-    Query<Map<String, dynamic>> query = _db
-        .collection(_collection)
+    Query<Map<String, dynamic>> query = _postsRef()
         .orderBy('createdAt', descending: true)
         .limit(limit);
 
@@ -57,9 +72,7 @@ class PostService {
     final snapshot = await query.get();
     final docs = snapshot.docs;
 
-    final posts = docs
-        .map((doc) => PostModel.fromJson(doc.data(), doc.id))
-        .toList();
+    final posts = docs.map((doc) => PostModel.fromJson(doc.data(), doc.id)).toList();
 
     return PostPageResult(
       posts: posts,
@@ -68,10 +81,8 @@ class PostService {
     );
   }
 
-  // Lấy bài viết theo địa điểm, sort phía client để tránh phụ thuộc index.
   Stream<List<PostModel>> getPostsByVenue(String venueId) {
-    return _db
-        .collection(_collection)
+    return _postsRef()
         .where('venueId', isEqualTo: venueId)
         .snapshots()
         .map((snapshot) {
@@ -93,7 +104,91 @@ class PostService {
     if (comments != null) data['commentsCount'] = FieldValue.increment(comments);
 
     if (data.isNotEmpty) {
-      await _db.collection(_collection).doc(postId).update(data);
+      await _postsRef().doc(postId).update(data);
     }
+  }
+
+  Future<bool> isPostLikedByUser(String postId, String userId) async {
+    final doc = await _likesRef(postId).doc(userId).get();
+    return doc.exists;
+  }
+
+  Future<void> togglePostLike({
+    required String postId,
+    required String userId,
+    required bool shouldLike,
+  }) async {
+    await _db.runTransaction((transaction) async {
+      final postRef = _postsRef().doc(postId);
+      final likeDocRef = _likesRef(postId).doc(userId);
+
+      if (shouldLike) {
+        transaction.set(likeDocRef, {
+          'userId': userId,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+        transaction.update(postRef, {'likesCount': FieldValue.increment(1)});
+      } else {
+        transaction.delete(likeDocRef);
+        transaction.update(postRef, {'likesCount': FieldValue.increment(-1)});
+      }
+    });
+  }
+
+  Stream<List<PostCommentModel>> getCommentsStream(String postId) {
+    return _commentsRef(postId)
+        .orderBy('createdAt', descending: false)
+        .limit(300)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => PostCommentModel.fromJson(doc.data(), doc.id))
+              .toList(),
+        );
+  }
+
+  Future<void> addComment({
+    required String postId,
+    required PostCommentModel comment,
+  }) async {
+    final postRef = _postsRef().doc(postId);
+    final commentRef = _commentsRef(postId).doc();
+
+    await _db.runTransaction((transaction) async {
+      transaction.set(commentRef, comment.toJson());
+      transaction.update(postRef, {'commentsCount': FieldValue.increment(1)});
+    });
+  }
+
+  Future<bool> isCommentLikedByUser(
+    String postId,
+    String commentId,
+    String userId,
+  ) async {
+    final doc = await _commentLikesRef(postId, commentId).doc(userId).get();
+    return doc.exists;
+  }
+
+  Future<void> toggleCommentLike({
+    required String postId,
+    required String commentId,
+    required String userId,
+    required bool shouldLike,
+  }) async {
+    await _db.runTransaction((transaction) async {
+      final commentRef = _commentsRef(postId).doc(commentId);
+      final likeDocRef = _commentLikesRef(postId, commentId).doc(userId);
+
+      if (shouldLike) {
+        transaction.set(likeDocRef, {
+          'userId': userId,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+        transaction.update(commentRef, {'likesCount': FieldValue.increment(1)});
+      } else {
+        transaction.delete(likeDocRef);
+        transaction.update(commentRef, {'likesCount': FieldValue.increment(-1)});
+      }
+    });
   }
 }
