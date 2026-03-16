@@ -3,6 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../models/user_model.dart';
+import '../../../models/post_model.dart';
+import '../../../services/gamification_service.dart';
+import '../../posts/post_detail_view.dart';
 
 class ProfileUserInfoSection extends StatelessWidget {
   const ProfileUserInfoSection({super.key, required this.user});
@@ -11,6 +14,11 @@ class ProfileUserInfoSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final double progress = GamificationService.getProgressToNextLevel(
+      user.exp,
+    );
+    final int nextThreshold = GamificationService.getNextThreshold(user.exp);
+
     return Column(
       children: [
         Text(
@@ -22,36 +30,72 @@ class ProfileUserInfoSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.workspace_premium,
-              color: AppColors.primary,
-              size: 16,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              user.title.isEmpty ? 'Thành viên mới' : user.title,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.workspace_premium,
                 color: AppColors.primary,
+                size: 14,
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text('|', style: TextStyle(color: Colors.grey[400])),
-            ),
-            Text(
-              '${user.exp} Points',
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.primary,
+              const SizedBox(width: 4),
+              Text(
+                user.title.isEmpty ? 'Tân Binh' : user.title,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.primary,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 60),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${user.exp} EXP',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF64748B),
+                    ),
+                  ),
+                  Text(
+                    '$nextThreshold EXP',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 8,
+                  backgroundColor: const Color(0xFFE2E8F0),
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -145,17 +189,17 @@ class ProfileStatCard extends StatelessWidget {
 }
 
 class ProfileBadgesSection extends StatelessWidget {
-  const ProfileBadgesSection({super.key});
+  const ProfileBadgesSection({super.key, required this.user});
+
+  final UserModel user;
 
   @override
   Widget build(BuildContext context) {
-    final badges = [
-      {'icon': Icons.stars, 'name': 'Golden Bean'},
-      {'icon': Icons.flight, 'name': 'Frequent\nFlyer'},
-      {'icon': Icons.coffee, 'name': 'Espresso'},
-      {'icon': Icons.map_outlined, 'name': 'Local Guide'},
-      {'icon': Icons.palette, 'name': 'Latte Art'},
-    ];
+    final badges = GamificationService.getAllBadges(
+      user.postsCount,
+      user.followers,
+      user.placesVisited,
+    );
 
     return Column(
       children: [
@@ -165,7 +209,7 @@ class ProfileBadgesSection extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Huy hiệu',
+                'Huy hiệu đạt được',
                 style: GoogleFonts.inter(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -185,29 +229,38 @@ class ProfileBadgesSection extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         SizedBox(
-          height: 110,
+          height: 120,
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             scrollDirection: Axis.horizontal,
             itemCount: badges.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 20),
+            separatorBuilder: (_, __) => const SizedBox(width: 16),
             itemBuilder: (_, index) {
               final badge = badges[index];
+              final bool isUnlocked = badge['isUnlocked'] as bool;
+
               return SizedBox(
-                width: 74,
+                width: 80,
                 child: Column(
                   children: [
                     Container(
                       width: 64,
                       height: 64,
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.15),
+                        color: isUnlocked
+                            ? AppColors.primary.withOpacity(0.15)
+                            : Colors.grey[200],
                         shape: BoxShape.circle,
+                        border: isUnlocked
+                            ? Border.all(color: AppColors.primary, width: 2)
+                            : null,
                       ),
                       child: Icon(
-                        badge['icon'] as IconData,
-                        color: AppColors.primary,
-                        size: 28,
+                        _getIconData(badge['icon'] as String),
+                        color: isUnlocked
+                            ? AppColors.primary
+                            : Colors.grey[400],
+                        size: 30,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -218,8 +271,12 @@ class ProfileBadgesSection extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(
                         fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF334155),
+                        fontWeight: isUnlocked
+                            ? FontWeight.bold
+                            : FontWeight.w500,
+                        color: isUnlocked
+                            ? const Color(0xFF334155)
+                            : Colors.grey[500],
                         height: 1.2,
                       ),
                     ),
@@ -232,22 +289,100 @@ class ProfileBadgesSection extends StatelessWidget {
       ],
     );
   }
+
+  IconData _getIconData(String iconName) {
+    switch (iconName) {
+      case 'stars':
+        return Icons.stars;
+      case 'military_tech':
+        return Icons.military_tech;
+      case 'workspace_premium':
+        return Icons.workspace_premium;
+      case 'person_add':
+        return Icons.person_add;
+      case 'explore':
+        return Icons.explore;
+      default:
+        return Icons.help_outline;
+    }
+  }
 }
 
 class ProfilePhotoGrid extends StatelessWidget {
-  const ProfilePhotoGrid({super.key});
+  const ProfilePhotoGrid({super.key, required this.posts});
+
+  final List<PostModel> posts;
 
   @override
   Widget build(BuildContext context) {
+    if (posts.isEmpty) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.photo_library_outlined,
+                      size: 48,
+                      color: Colors.grey[300],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Chưa có bài viết nào',
+                      style: GoogleFonts.inter(color: Colors.grey[500]),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    }
+
     return GridView.builder(
-      padding: EdgeInsets.zero,
+      padding: const EdgeInsets.all(1),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
-        crossAxisSpacing: 2,
-        mainAxisSpacing: 2,
+        crossAxisSpacing: 1,
+        mainAxisSpacing: 1,
       ),
-      itemCount: 15,
-      itemBuilder: (_, __) => Container(color: Colors.grey[300]),
+      itemCount: posts.length,
+      itemBuilder: (context, index) {
+        final post = posts[index];
+        return GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PostDetailView(post: post),
+              ),
+            );
+          },
+          child: Container(
+            decoration: BoxDecoration(color: Colors.grey[100]),
+            child: post.images.isNotEmpty
+                ? Image.network(
+                    post.images.first,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Center(
+                      child: Icon(
+                        Icons.broken_image_outlined,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  )
+                : const Center(
+                    child: Icon(Icons.image_outlined, color: Colors.grey),
+                  ),
+          ),
+        );
+      },
     );
   }
 }

@@ -17,7 +17,9 @@ class _SplashViewState extends State<SplashView> {
   @override
   void initState() {
     super.initState();
-    _startInitialization();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startInitialization();
+    });
   }
 
   Future<void> _startInitialization() async {
@@ -25,7 +27,7 @@ class _SplashViewState extends State<SplashView> {
     await viewModel.initializeApp();
 
     if (mounted) {
-      // Sau khi load xong, chuyển sang Login hoặc Home
+      final viewModel = context.read<SplashViewModel>();
       if (viewModel.isLoggedIn) {
         Navigator.pushReplacement(
           context,

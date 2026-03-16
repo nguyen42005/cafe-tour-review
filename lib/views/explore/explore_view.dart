@@ -1,4 +1,5 @@
 ﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -22,7 +23,8 @@ class ExploreView extends StatefulWidget {
 }
 
 class _ExploreViewState extends State<ExploreView> {
-  static const int _pageSize = 10;
+  static const int _pageSize = 15; // Tăng size trang để mượt hơn
+  static const int _recommendationLimit = 50; // Tăng lượng bài đề xuất ban đầu
 
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -64,6 +66,7 @@ class _ExploreViewState extends State<ExploreView> {
       _error = null;
       _isInitialLoading = true;
       _isLoadingMore = false;
+      _isShowingRecommendations = true;
     });
 
     await _fetchNextPage();
@@ -73,22 +76,64 @@ class _ExploreViewState extends State<ExploreView> {
     }
   }
 
+  bool _isShowingRecommendations = true;
+
   Future<void> _fetchNextPage() async {
     if (!_hasMore || _isLoadingMore) return;
 
     setState(() => _isLoadingMore = true);
     try {
-      final result = await _postService.getPostsPage(
-        lastDocument: _lastDoc,
-        limit: _pageSize,
-      );
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final query = _searchController.text.trim();
+
+      List<PostModel> posts = [];
+      DocumentSnapshot<Map<String, dynamic>>? lastDoc;
+      bool hasMore = false;
+
+      if (query.isEmpty && uid != null && _isShowingRecommendations) {
+        // Giai đoạn 1: Lấy các bài viết gợi ý/hot nhất trước
+        posts = await _postService.getRecommendedPosts(
+          uid: uid,
+          limit: _recommendationLimit,
+        );
+
+        // Sau khi lấy xong gợi ý, lần sau sẽ chuyển sang lấy bài viết mới nhất bình thường
+        _isShowingRecommendations = false;
+        hasMore = true; // Cho phép tải tiếp bài viết mới
+        lastDoc = null; // Start fresh for chronological paging
+      } else {
+        // Giai đoạn 2: Tải bài viết theo thời gian (Pagination bình thường)
+        // Nếu query có text, bỏ qua gợi ý và search trực tiếp
+        final result = await _postService.getPostsPage(
+          lastDocument: _lastDoc,
+          limit: _pageSize,
+        );
+        posts = result.posts;
+        lastDoc = result.lastDocument;
+        hasMore = result.hasMore;
+      }
 
       if (!mounted) return;
 
       setState(() {
-        _posts.addAll(result.posts);
-        _lastDoc = result.lastDocument;
-        _hasMore = result.hasMore;
+        // Lọc trùng lặp để đảm bảo không bị lặp bài viết từ giai đoạn 1
+        final existingIds = _posts.map((p) => p.id).toSet();
+        final uniquePosts = posts
+            .where((p) => !existingIds.contains(p.id))
+            .toList();
+
+        _posts.addAll(uniquePosts);
+        _lastDoc = lastDoc;
+
+        // Nếu trang hiện tại rỗng (đã lọc hết trùng), hãy thử fetch trang tiếp theo ngay
+        if (uniquePosts.isEmpty && posts.isNotEmpty && hasMore) {
+          _isLoadingMore = false;
+          _hasMore = true;
+          _fetchNextPage();
+          return;
+        }
+
+        _hasMore = hasMore;
         _error = null;
       });
     } catch (e) {
@@ -102,10 +147,10 @@ class _ExploreViewState extends State<ExploreView> {
   }
 
   void _onScroll() {
-    if (!_scrollController.hasClients) return;
+    if (!_scrollController.hasClients || _isLoadingMore || !_hasMore) return;
 
     final position = _scrollController.position;
-    if (position.pixels >= position.maxScrollExtent - 280) {
+    if (position.pixels >= position.maxScrollExtent - 400) {
       _fetchNextPage();
     }
   }
@@ -140,27 +185,36 @@ class _ExploreViewState extends State<ExploreView> {
                 builder: (context, placeSnapshot) {
                   if (placeSnapshot.hasError) {
                     return _MessageView(
-                      text: 'Lỗi tải danh sách địa điểm: ${placeSnapshot.error}',
+                      text:
+                          'Lỗi tải danh sách địa điểm: ${placeSnapshot.error}',
                       color: Colors.red[400],
                     );
                   }
 
                   final places = placeSnapshot.data ?? [];
-                  final placesById = {for (final place in places) place.id: place};
+                  final placesById = {
+                    for (final place in places) place.id: place,
+                  };
 
                   if (_isInitialLoading && _posts.isEmpty) {
                     return const Center(
-                      child: CircularProgressIndicator(color: AppColors.primary),
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary,
+                      ),
                     );
                   }
 
                   if (_error != null && _posts.isEmpty) {
-                    return _RetryView(text: _error!, onRetry: _loadInitialPosts);
+                    return _RetryView(
+                      text: _error!,
+                      onRetry: _loadInitialPosts,
+                    );
                   }
 
                   final filteredPosts = _posts.where((post) {
                     final place = placesById[post.venueId];
-                    return _matchSearch(post, place) && _matchFilter(post, place);
+                    return _matchSearch(post, place) &&
+                        _matchFilter(post, place);
                   }).toList();
 
                   if (filteredPosts.length < 4 && _hasMore && !_isLoadingMore) {
@@ -205,7 +259,8 @@ class _ExploreViewState extends State<ExploreView> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => PlaceDetailView(place: place),
+                                    builder: (context) =>
+                                        PlaceDetailView(place: place),
                                   ),
                                 );
                               },
@@ -249,7 +304,8 @@ class _ExploreViewState extends State<ExploreView> {
             haystack.contains('cà phê') ||
             haystack.contains('cafe');
       case ExploreFilter.travel:
-        final haystack = '${post.content} ${place?.categoryName ?? ''}'.toLowerCase();
+        final haystack = '${post.content} ${place?.categoryName ?? ''}'
+            .toLowerCase();
         return haystack.contains('du lịch') ||
             haystack.contains('travel') ||
             haystack.contains('trip') ||
@@ -355,8 +411,13 @@ class _RetryView extends StatelessWidget {
             const SizedBox(height: 10),
             ElevatedButton(
               onPressed: onRetry,
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-              child: const Text('Thử lại', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+              ),
+              child: const Text(
+                'Thử lại',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         ),
@@ -364,6 +425,3 @@ class _RetryView extends StatelessWidget {
     );
   }
 }
-
-
-

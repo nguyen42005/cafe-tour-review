@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../auth/login_view.dart';
-import '../../services/auth_service.dart';
+import '../../view_models/auth_view_model.dart';
+import '../../view_models/profile_view_model.dart';
 
 class HomeView extends StatelessWidget {
   const HomeView({super.key});
@@ -17,8 +19,9 @@ class HomeView extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
-              await AuthService().signOut();
+              await context.read<AuthViewModel>().logout();
               if (context.mounted) {
+                context.read<ProfileViewModel>().clearProfile();
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (context) => const LoginView()),

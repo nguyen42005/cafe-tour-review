@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../models/post_model.dart';
 import '../../models/place_model.dart';
 import '../../services/place_service.dart';
 import '../../view_models/create_post_view_model.dart';
@@ -11,7 +12,9 @@ import '../places/create_place_view.dart';
 import 'widgets/create_post_sections.dart';
 
 class CreatePostView extends StatefulWidget {
-  const CreatePostView({super.key});
+  const CreatePostView({super.key, this.initialPost});
+
+  final PostModel? initialPost;
 
   @override
   State<CreatePostView> createState() => _CreatePostViewState();
@@ -19,6 +22,22 @@ class CreatePostView extends StatefulWidget {
 
 class _CreatePostViewState extends State<CreatePostView> {
   final TextEditingController _contentController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _contentController.text = widget.initialPost?.content ?? '';
+
+    // Khởi tạo viewModel trong post-frame hoặc dùng logic init
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final viewModel = context.read<CreatePostViewModel>();
+      if (widget.initialPost != null) {
+        viewModel.initForEdit(widget.initialPost!);
+      } else {
+        viewModel.reset();
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -40,7 +59,7 @@ class _CreatePostViewState extends State<CreatePostView> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'Tạo bài đăng mới',
+          viewModel.isEditing ? 'Chỉnh sửa bài đăng' : 'Tạo bài đăng mới',
           style: GoogleFonts.inter(fontWeight: FontWeight.bold),
         ),
         elevation: 0,
@@ -116,7 +135,13 @@ class _CreatePostViewState extends State<CreatePostView> {
           final success = await viewModel.submitPost(user);
           if (success && mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Đăng bài thành công!')),
+              SnackBar(
+                content: Text(
+                  viewModel.isEditing
+                      ? 'Cập nhật bài viết thành công!'
+                      : 'Đăng bài thành công!',
+                ),
+              ),
             );
             Navigator.pop(context);
           } else if (mounted && viewModel.errorMessage != null) {
@@ -372,5 +397,3 @@ class _PlaceListItem extends StatelessWidget {
     );
   }
 }
-
-

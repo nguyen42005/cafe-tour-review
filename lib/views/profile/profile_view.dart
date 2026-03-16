@@ -5,8 +5,8 @@ import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/custom_dialog.dart';
-import '../../services/auth_service.dart';
 import '../../view_models/profile_view_model.dart';
+import '../../view_models/auth_view_model.dart';
 import '../admin/dashboard_admin_view.dart';
 import '../auth/login_view.dart';
 import 'widgets/profile_sections.dart';
@@ -72,56 +72,60 @@ class ProfileView extends StatelessWidget {
       ),
       body: DefaultTabController(
         length: 3,
-        child: NestedScrollView(
-          headerSliverBuilder: (context, innerBoxIsScrolled) {
-            return [
-              SliverToBoxAdapter(
-                child: Column(
-                  children: [
-                    const SizedBox(height: 24),
-                    _buildAvatarSection(context, viewModel),
-                    const SizedBox(height: 16),
-                    ProfileUserInfoSection(user: user),
-                    const SizedBox(height: 24),
-                    ProfileStatsRow(user: user),
-                    const SizedBox(height: 32),
-                    const ProfileBadgesSection(),
-                    const SizedBox(height: 24),
-                  ],
-                ),
-              ),
-              SliverPersistentHeader(
-                pinned: true,
-                delegate: ProfileTabHeaderDelegate(
-                  TabBar(
-                    labelColor: AppColors.primary,
-                    unselectedLabelColor: Colors.grey[500],
-                    indicatorColor: AppColors.primary,
-                    indicatorWeight: 3,
-                    labelStyle: GoogleFonts.inter(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                    unselectedLabelStyle: GoogleFonts.inter(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                    ),
-                    tabs: const [
-                      Tab(text: 'Bài của tôi'),
-                      Tab(text: 'Lịch sử'),
-                      Tab(text: 'Đã lưu'),
+        child: RefreshIndicator(
+          onRefresh: () => viewModel.refreshProfile(),
+          color: AppColors.primary,
+          child: NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) {
+              return [
+                SliverToBoxAdapter(
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 24),
+                      _buildAvatarSection(context, viewModel),
+                      const SizedBox(height: 16),
+                      ProfileUserInfoSection(user: user),
+                      const SizedBox(height: 24),
+                      ProfileStatsRow(user: user),
+                      const SizedBox(height: 32),
+                      ProfileBadgesSection(user: user),
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
-              ),
-            ];
-          },
-          body: const TabBarView(
-            children: [
-              ProfilePhotoGrid(),
-              Center(child: Text('Lịch sử di chuyển')),
-              Center(child: Text('Bài viết đã lưu')),
-            ],
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: ProfileTabHeaderDelegate(
+                    TabBar(
+                      labelColor: AppColors.primary,
+                      unselectedLabelColor: Colors.grey[500],
+                      indicatorColor: AppColors.primary,
+                      indicatorWeight: 3,
+                      labelStyle: GoogleFonts.inter(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                      unselectedLabelStyle: GoogleFonts.inter(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                      tabs: const [
+                        Tab(text: 'Bài của tôi'),
+                        Tab(text: 'Bài đã ẩn'),
+                        Tab(text: 'Đã lưu'),
+                      ],
+                    ),
+                  ),
+                ),
+              ];
+            },
+            body: TabBarView(
+              children: [
+                ProfilePhotoGrid(posts: viewModel.userPosts),
+                ProfilePhotoGrid(posts: viewModel.hiddenPosts),
+                ProfilePhotoGrid(posts: viewModel.savedPosts),
+              ],
+            ),
           ),
         ),
       ),
@@ -304,8 +308,9 @@ class ProfileView extends StatelessWidget {
                   ),
                 ),
                 onTap: () async {
-                  await AuthService().signOut();
+                  await context.read<AuthViewModel>().logout();
                   if (context.mounted) {
+                    context.read<ProfileViewModel>().clearProfile();
                     Navigator.pushAndRemoveUntil(
                       context,
                       MaterialPageRoute(
@@ -399,6 +404,3 @@ class _AvatarCameraBadge extends StatelessWidget {
     );
   }
 }
-
-
-

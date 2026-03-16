@@ -1,6 +1,7 @@
 ﻿import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/custom_dialog.dart';
@@ -10,6 +11,10 @@ import '../../../models/post_comment_model.dart';
 import '../../../models/post_model.dart';
 import '../../../services/post_service.dart';
 import '../../../services/user_service.dart';
+import '../../../view_models/profile_view_model.dart';
+import '../../../view_models/report_view_model.dart';
+import '../../../models/report_model.dart';
+import '../../posts/create_post_view.dart';
 
 class ExplorePostFeedCard extends StatefulWidget {
   const ExplorePostFeedCard({
@@ -34,8 +39,10 @@ class _ExplorePostFeedCardState extends State<ExplorePostFeedCard> {
   int _currentImage = 0;
   bool _isLiked = false;
   bool _isSaved = false;
+  bool _isFollowing = false;
   bool _isLikeLoading = false;
   bool _isSaveLoading = false;
+  bool _isFollowLoading = false;
   int _likesCount = 0;
   int _commentsCount = 0;
 
@@ -70,10 +77,13 @@ class _ExplorePostFeedCardState extends State<ExplorePostFeedCard> {
     try {
       final liked = await _postService.isPostLikedByUser(widget.post.id, uid);
       final saved = await _userService.isPostSaved(uid, widget.post.id);
+      final following = await _userService.isFollowing(uid, widget.post.userId);
+
       if (!mounted) return;
       setState(() {
         _isLiked = liked;
         _isSaved = saved;
+        _isFollowing = following;
       });
     } catch (_) {}
   }
@@ -85,6 +95,9 @@ class _ExplorePostFeedCardState extends State<ExplorePostFeedCard> {
         : ((widget.place?.coverImage ?? '').isNotEmpty
               ? [widget.place!.coverImage]
               : <String>[]);
+
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    final isOwnPost = currentUid == widget.post.userId;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -111,21 +124,55 @@ class _ExplorePostFeedCardState extends State<ExplorePostFeedCard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        widget.post.userName,
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            widget.post.userName,
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          if (!isOwnPost) ...[
+                            const SizedBox(width: 8),
+                            const Text(
+                              '•',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 10,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            InkWell(
+                              onTap: _isFollowLoading ? null : _toggleFollow,
+                              child: Text(
+                                _isFollowing ? 'Đang theo dõi' : 'Theo dõi',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: _isFollowing
+                                      ? Colors.grey
+                                      : AppColors.primary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 2),
                       Row(
                         children: [
-                          Icon(Icons.location_on, size: 12, color: Colors.grey[500]),
+                          Icon(
+                            Icons.location_on,
+                            size: 12,
+                            color: Colors.grey[500],
+                          ),
                           const SizedBox(width: 2),
                           Expanded(
                             child: Text(
-                              _shortLocation(widget.place?.address ?? widget.post.venueName),
+                              _shortLocation(
+                                widget.place?.address ?? widget.post.venueName,
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.inter(
@@ -166,7 +213,7 @@ class _ExplorePostFeedCardState extends State<ExplorePostFeedCard> {
                   ),
                 ),
                 IconButton(
-                  onPressed: () {},
+                  onPressed: () => _showPostOptions(context),
                   icon: const Icon(Icons.more_horiz),
                   color: Colors.grey[500],
                 ),
@@ -179,13 +226,17 @@ class _ExplorePostFeedCardState extends State<ExplorePostFeedCard> {
               children: [
                 _PostImageCarousel(
                   images: imageList,
-                  onPageChanged: (index) => setState(() => _currentImage = index),
+                  onPageChanged: (index) =>
+                      setState(() => _currentImage = index),
                 ),
                 Positioned(
                   top: 10,
                   right: 10,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black.withOpacity(0.45),
                       borderRadius: BorderRadius.circular(999),
@@ -211,7 +262,10 @@ class _ExplorePostFeedCardState extends State<ExplorePostFeedCard> {
                     bottom: 10,
                     right: 10,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.45),
                         borderRadius: BorderRadius.circular(999),
@@ -258,7 +312,9 @@ class _ExplorePostFeedCardState extends State<ExplorePostFeedCard> {
                   children: [
                     _FeedActionIconButton(
                       icon: _isLiked ? Icons.favorite : Icons.favorite_border,
-                      iconColor: _isLiked ? Colors.red : const Color(0xFF334155),
+                      iconColor: _isLiked
+                          ? Colors.red
+                          : const Color(0xFF334155),
                       text: _formatCount(_likesCount),
                       onTap: _isLikeLoading ? null : _toggleLike,
                     ),
@@ -283,7 +339,9 @@ class _ExplorePostFeedCardState extends State<ExplorePostFeedCard> {
                       onPressed: _isSaveLoading ? null : _toggleSave,
                       icon: Icon(
                         _isSaved ? Icons.bookmark : Icons.bookmark_border,
-                        color: _isSaved ? AppColors.primary : const Color(0xFF334155),
+                        color: _isSaved
+                            ? AppColors.primary
+                            : const Color(0xFF334155),
                       ),
                       visualDensity: VisualDensity.compact,
                     ),
@@ -346,7 +404,8 @@ class _ExplorePostFeedCardState extends State<ExplorePostFeedCard> {
 
   Future<void> _toggleLike() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) {
+    final user = context.read<ProfileViewModel>().currentUser;
+    if (uid == null || user == null) {
       await CustomDialog.showInfo(
         context,
         title: 'Yêu cầu đăng nhập',
@@ -366,7 +425,7 @@ class _ExplorePostFeedCardState extends State<ExplorePostFeedCard> {
     try {
       await _postService.togglePostLike(
         postId: widget.post.id,
-        userId: uid,
+        liker: user,
         shouldLike: next,
       );
     } catch (e) {
@@ -404,6 +463,10 @@ class _ExplorePostFeedCardState extends State<ExplorePostFeedCard> {
 
     try {
       await _userService.toggleSavedPost(uid, widget.post.id, next);
+      // Sync saved tab in profile
+      if (mounted) {
+        context.read<ProfileViewModel>().refreshProfile();
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSaved = !next);
@@ -430,6 +493,268 @@ class _ExplorePostFeedCardState extends State<ExplorePostFeedCard> {
         },
       ),
     );
+  }
+
+  Future<void> _toggleFollow() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final user = context.read<ProfileViewModel>().currentUser;
+    if (uid == null || user == null) {
+      await CustomDialog.showInfo(
+        context,
+        title: 'Yêu cầu đăng nhập',
+        message: 'Vui lòng đăng nhập để theo dõi người dùng.',
+      );
+      return;
+    }
+
+    final next = !_isFollowing;
+    setState(() {
+      _isFollowLoading = true;
+      _isFollowing = next;
+    });
+
+    try {
+      if (next) {
+        await _userService.followUser(user, widget.post.userId);
+      } else {
+        await _userService.unfollowUser(uid, widget.post.userId);
+      }
+      // Sync profile stats
+      if (mounted) {
+        context.read<ProfileViewModel>().refreshProfile();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isFollowing = !next);
+      await CustomDialog.showError(
+        context,
+        title: 'Thất bại',
+        message: 'Có lỗi xảy ra khi thực hiện: $e',
+      );
+    } finally {
+      if (mounted) setState(() => _isFollowLoading = false);
+    }
+  }
+
+  void _showPostOptions(BuildContext context) {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    final isOwnPost = currentUid == widget.post.userId;
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (bottomSheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              if (isOwnPost) ...[
+                ListTile(
+                  leading: const Icon(Icons.edit_outlined),
+                  title: const Text('Chỉnh sửa bài viết'),
+                  onTap: () {
+                    Navigator.pop(bottomSheetContext);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            CreatePostView(initialPost: widget.post),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: Icon(
+                    widget.post.isHidden
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                  ),
+                  title: Text(
+                    widget.post.isHidden ? 'Hiện bài viết' : 'Ẩn bài viết',
+                  ),
+                  onTap: () async {
+                    Navigator.pop(bottomSheetContext);
+                    final profileVM = context.read<ProfileViewModel>();
+                    final success = await profileVM.toggleHidePost(
+                      widget.post.id,
+                      !widget.post.isHidden,
+                    );
+                    if (success && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            widget.post.isHidden
+                                ? 'Đã hiện bài viết'
+                                : 'Đã ẩn bài viết',
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.delete_outline, color: Colors.red),
+                  title: const Text(
+                    'Xóa bài viết',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                  onTap: () async {
+                    Navigator.pop(bottomSheetContext);
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Xóa bài viết'),
+                        content: const Text(
+                          'Bạn có chắc chắn muốn xóa bài viết này không?',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text(
+                              'Hủy',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text(
+                              'Xóa',
+                              style: TextStyle(color: Colors.red),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (confirm == true && context.mounted) {
+                      final profileVM = context.read<ProfileViewModel>();
+                      final success = await profileVM.deletePost(
+                        widget.post.id,
+                      );
+                      if (success && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Đã xóa bài viết')),
+                        );
+                        // Nếu đang ở màn hình chi tiết, back lại
+                        if (Navigator.canPop(context)) {
+                          Navigator.pop(context);
+                        }
+                      }
+                    }
+                  },
+                ),
+              ] else ...[
+                ListTile(
+                  leading: const Icon(Icons.report_outlined, color: Colors.red),
+                  title: const Text(
+                    'Báo cáo bài viết',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                  onTap: () {
+                    Navigator.pop(bottomSheetContext);
+                    _showReportReasons(context);
+                  },
+                ),
+              ],
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showReportReasons(BuildContext context) {
+    final reasons = [
+      'Nội dung không phù hợp',
+      'Spam / Quấy rối',
+      'Thông tin sai lệch',
+      'Vi phạm bản quyền',
+      'Khác',
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Text(
+                  'Tại sao bạn báo cáo bài viết này?',
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              const Divider(height: 1),
+              ...reasons.map(
+                (reason) => ListTile(
+                  title: Text(reason, style: GoogleFonts.inter(fontSize: 14)),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await _submitReport(context, reason);
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _submitReport(BuildContext context, String reason) async {
+    final currentUser = context.read<ProfileViewModel>().currentUser;
+    if (currentUser == null) return;
+
+    final report = ReportModel(
+      id: '',
+      reporterId: currentUser.id,
+      reporterName: currentUser.displayName,
+      targetId: widget.post.id,
+      targetType: 'post',
+      reason: reason,
+      createdAt: DateTime.now(),
+    );
+
+    final success = await context.read<ReportViewModel>().submitReport(report);
+
+    if (context.mounted) {
+      if (success) {
+        CustomDialog.showInfo(
+          context,
+          title: 'Cảm ơn bạn',
+          message:
+              'Báo cáo của bạn đã được gửi. Chúng tôi sẽ xem xét nội dung này sớm nhất có thể.',
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Không thể gửi báo cáo. Vui lòng thử lại sau.'),
+          ),
+        );
+      }
+    }
   }
 
   static String _shortLocation(String location) {
@@ -534,16 +859,22 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(
-                      child: CircularProgressIndicator(color: AppColors.primary),
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary,
+                      ),
                     );
                   }
 
                   final comments = snapshot.data ?? [];
                   _ensureLikeStates(comments);
 
-                  final root = comments.where((c) => c.parentId.isEmpty).toList();
+                  final root = comments
+                      .where((c) => c.parentId.isEmpty)
+                      .toList();
                   final repliesMap = <String, List<PostCommentModel>>{};
-                  for (final c in comments.where((x) => x.parentId.isNotEmpty)) {
+                  for (final c in comments.where(
+                    (x) => x.parentId.isNotEmpty,
+                  )) {
                     repliesMap.putIfAbsent(c.parentId, () => []).add(c);
                   }
 
@@ -566,16 +897,20 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                         comment: comment,
                         replies: replies,
                         isLiked: _likedState[comment.id] ?? false,
-                        likesCount: _likesOverride[comment.id] ?? comment.likesCount,
+                        likesCount:
+                            _likesOverride[comment.id] ?? comment.likesCount,
                         isLikeLoading: _likeLoading.contains(comment.id),
                         onLike: () => _toggleCommentLike(comment),
                         onReply: () {
                           setState(() => _replyTo = comment);
                           _focusNode.requestFocus();
                         },
-                        replyLikeResolver: (reply) => _likedState[reply.id] ?? false,
-                        replyCountResolver: (reply) => _likesOverride[reply.id] ?? reply.likesCount,
-                        replyLoadingResolver: (reply) => _likeLoading.contains(reply.id),
+                        replyLikeResolver: (reply) =>
+                            _likedState[reply.id] ?? false,
+                        replyCountResolver: (reply) =>
+                            _likesOverride[reply.id] ?? reply.likesCount,
+                        replyLoadingResolver: (reply) =>
+                            _likeLoading.contains(reply.id),
                         onLikeReply: (reply) => _toggleCommentLike(reply),
                         onReplyReply: (reply) {
                           setState(() => _replyTo = reply);
@@ -623,7 +958,11 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                   ),
                   GestureDetector(
                     onTap: () => setState(() => _replyTo = null),
-                    child: const Icon(Icons.close, size: 16, color: AppColors.primary),
+                    child: const Icon(
+                      Icons.close,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
                   ),
                 ],
               ),
@@ -685,13 +1024,20 @@ class _CommentsSheetState extends State<_CommentsSheet> {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    final missing = comments.where((c) => !_likedState.containsKey(c.id)).map((c) => c.id).toList();
+    final missing = comments
+        .where((c) => !_likedState.containsKey(c.id))
+        .map((c) => c.id)
+        .toList();
     if (missing.isEmpty) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       for (final id in missing) {
         try {
-          final liked = await widget.postService.isCommentLikedByUser(widget.postId, id, uid);
+          final liked = await widget.postService.isCommentLikedByUser(
+            widget.postId,
+            id,
+            uid,
+          );
           if (!mounted) return;
           setState(() => _likedState[id] = liked);
         } catch (_) {
@@ -722,7 +1068,10 @@ class _CommentsSheetState extends State<_CommentsSheet> {
     setState(() {
       _likeLoading.add(comment.id);
       _likedState[comment.id] = next;
-      _likesOverride[comment.id] = (currentCount + (next ? 1 : -1)).clamp(0, 999999999);
+      _likesOverride[comment.id] = (currentCount + (next ? 1 : -1)).clamp(
+        0,
+        999999999,
+      );
     });
 
     try {
@@ -752,8 +1101,8 @@ class _CommentsSheetState extends State<_CommentsSheet> {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     final firebaseUser = FirebaseAuth.instance.currentUser;
     final content = _commentController.text.trim();
-
-    if (uid == null || firebaseUser == null) {
+    final user = context.read<ProfileViewModel>().currentUser;
+    if (uid == null || firebaseUser == null || user == null) {
       await CustomDialog.showInfo(
         context,
         title: 'Yêu cầu đăng nhập',
@@ -769,17 +1118,20 @@ class _CommentsSheetState extends State<_CommentsSheet> {
       final comment = PostCommentModel(
         id: '',
         userId: uid,
-        userName: firebaseUser.displayName?.trim().isNotEmpty == true
-            ? firebaseUser.displayName!.trim()
-            : 'Người dùng',
-        userPhotoUrl: firebaseUser.photoURL ?? '',
+        userName: user.displayName,
+        userPhotoUrl: user.photoUrl,
         content: content,
         parentId: _replyTo?.id ?? '',
         likesCount: 0,
         createdAt: DateTime.now(),
       );
 
-      await widget.postService.addComment(postId: widget.postId, comment: comment);
+      await widget.postService.addComment(
+        postId: widget.postId,
+        comment: comment,
+        performerName: user.displayName,
+        performerPhoto: user.photoUrl,
+      );
       _commentController.clear();
       _focusNode.unfocus();
       widget.onCommentAdded();

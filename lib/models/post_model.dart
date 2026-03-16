@@ -13,6 +13,8 @@ class PostModel {
   final List<String> hashtags;
   final int likesCount;
   final int commentsCount;
+  final double hotScore; // (likes * 10) + (comments * 20)
+  final bool isHidden;
   final DateTime createdAt;
 
   PostModel({
@@ -28,6 +30,8 @@ class PostModel {
     this.hashtags = const [],
     this.likesCount = 0,
     this.commentsCount = 0,
+    this.hotScore = 0.0,
+    this.isHidden = false,
     required this.createdAt,
   });
 
@@ -45,6 +49,11 @@ class PostModel {
       hashtags: List<String>.from(json['hashtags'] ?? []),
       likesCount: json['likesCount'] ?? 0,
       commentsCount: json['commentsCount'] ?? 0,
+      hotScore: json['hotScore'] != null
+          ? (json['hotScore'] as num).toDouble()
+          : (((json['likesCount'] ?? 0) * 10.0) +
+                ((json['commentsCount'] ?? 0) * 30.0)),
+      isHidden: json['isHidden'] ?? false,
       createdAt: (json['createdAt'] as Timestamp).toDate(),
     );
   }
@@ -62,6 +71,8 @@ class PostModel {
       'hashtags': hashtags,
       'likesCount': likesCount,
       'commentsCount': commentsCount,
+      'hotScore': hotScore,
+      'isHidden': isHidden,
       'createdAt': FieldValue.serverTimestamp(),
     };
   }

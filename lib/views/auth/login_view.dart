@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/custom_dialog.dart';
 import '../../view_models/auth_view_model.dart';
+import '../../view_models/profile_view_model.dart';
 import '../main/main_view.dart';
 import '../admin/dashboard_admin_view.dart';
 import 'register_view.dart';
@@ -37,6 +38,8 @@ class _LoginViewState extends State<LoginView> {
     );
 
     if (user != null && mounted) {
+      await context.read<ProfileViewModel>().loadUserProfile();
+
       if (user.role == 'admin') {
         Navigator.pushReplacement(
           context,

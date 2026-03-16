@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_colors.dart';
 import '../explore/explore_view.dart';
 import '../map/map_view.dart';
-import '../history/history_view.dart';
+import '../activity/activity_view.dart';
 import '../profile/profile_view.dart';
 import '../posts/create_post_view.dart';
 
@@ -21,7 +21,7 @@ class _MainViewState extends State<MainView> {
     const ExploreView(),
     const MapView(),
     const SizedBox.shrink(), // Dummy cho nút đăng bài nổi
-    const HistoryView(),
+    const ActivityView(),
     const ProfileView(),
   ];
 
@@ -98,7 +98,11 @@ class CustomBottomNavBar extends StatelessWidget {
           _buildNavItem(icon: Icons.explore, label: 'Khám phá', index: 0),
           _buildNavItem(icon: Icons.map, label: 'Bản đồ', index: 1),
           const SizedBox(width: 48), // Khoảng trống cho FAB
-          _buildNavItem(icon: Icons.history, label: 'Lịch sử', index: 3),
+          _buildNavItem(
+            icon: Icons.notifications_none,
+            label: 'Hoạt động',
+            index: 3,
+          ),
           _buildNavItem(icon: Icons.person, label: 'Cá nhân', index: 4),
         ],
       ),

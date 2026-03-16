@@ -3,26 +3,47 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/user_model.dart';
+import '../models/post_model.dart';
 import '../services/user_service.dart';
 import '../services/cloudinary_service.dart';
+import '../services/post_service.dart';
 
 class ProfileViewModel extends ChangeNotifier {
   final UserService _userService = UserService();
+  final PostService _postService = PostService();
   final CloudinaryService _cloudinaryService = CloudinaryService();
   final ImagePicker _picker = ImagePicker();
 
   UserModel? _currentUser;
+  List<PostModel> _userPosts = [];
+  List<PostModel> _hiddenPosts = [];
+  List<PostModel> _savedPosts = [];
   bool _isLoading = true;
   bool _isUploading = false;
   String? _errorMessage;
 
   UserModel? get currentUser => _currentUser;
+  List<PostModel> get userPosts => _userPosts;
+  List<PostModel> get hiddenPosts => _hiddenPosts;
+  List<PostModel> get savedPosts => _savedPosts;
   bool get isLoading => _isLoading;
   bool get isUploading => _isUploading;
   String? get errorMessage => _errorMessage;
 
   ProfileViewModel() {
     loadUserProfile();
+  }
+
+  Future<void> refreshProfile() async {
+    await loadUserProfile();
+  }
+
+  void clearProfile() {
+    _currentUser = null;
+    _userPosts = [];
+    _hiddenPosts = [];
+    _savedPosts = [];
+    notifyListeners();
   }
 
   Future<void> loadUserProfile() async {
@@ -39,7 +60,7 @@ class ProfileViewModel extends ChangeNotifier {
     try {
       _currentUser = await _userService.getUser(uid);
 
-      // Nếu user chưa tồn tại trong Firestore (vd tk cũ đã login nhưng chưa có trong db users), tạo bản ghi mới
+      // Nếu user chưa tồn tại trong Firestore, tạo bản ghi mới
       if (_currentUser == null) {
         final firebaseUser = FirebaseAuth.instance.currentUser!;
         _currentUser = UserModel(
@@ -48,19 +69,103 @@ class ProfileViewModel extends ChangeNotifier {
           displayName: firebaseUser.displayName ?? 'Chưa cập nhật tên',
           photoUrl: firebaseUser.photoURL ?? '',
           exp: 0,
-          title: 'Thành viên mới',
+          title: 'Tân Binh',
           followers: 0,
           following: 0,
           placesVisited: 0,
           postsCount: 0,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
         );
         await _userService.saveUser(_currentUser!);
+      }
+
+      // Tải danh sách bài viết của user
+      final postsStream = _postService.getPosts(userId: uid);
+      final allUserPosts = await postsStream.first;
+
+      _userPosts = allUserPosts.where((p) => !p.isHidden).toList();
+      _hiddenPosts = allUserPosts.where((p) => p.isHidden).toList();
+
+      // Cập nhật số lượng bài viết nếu khác biệt
+      if (_currentUser!.postsCount != _userPosts.length) {
+        _currentUser!.postsCount = _userPosts.length;
+        await _userService.updatePartialUser(uid, {
+          'postsCount': _userPosts.length,
+        });
+      }
+
+      // Tải danh sách bài viết đã lưu
+      if (_currentUser!.savedPostIds.isNotEmpty) {
+        _savedPosts = await _postService.getPostsByIds(
+          _currentUser!.savedPostIds,
+        );
+      } else {
+        _savedPosts = [];
       }
     } catch (e) {
       _errorMessage = 'Lỗi tải thông tin: $e';
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<bool> isFollowing(String targetUid) async {
+    if (_currentUser == null) return false;
+    return await _userService.isFollowing(_currentUser!.id, targetUid);
+  }
+
+  Future<bool> followUser(String targetUid) async {
+    if (_currentUser == null) return false;
+    try {
+      await _userService.followUser(_currentUser!, targetUid);
+      // Cập nhật local state nếu cần, hoặc reload profile
+      await loadUserProfile();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Lỗi follow: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> unfollowUser(String targetUid) async {
+    if (_currentUser == null) return false;
+    try {
+      await _userService.unfollowUser(_currentUser!.id, targetUid);
+      await loadUserProfile();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Lỗi unfollow: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deletePost(String postId) async {
+    if (_currentUser == null) return false;
+    try {
+      await _postService.deletePost(postId, _currentUser!.id);
+      await loadUserProfile();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Lỗi xóa bài: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> toggleHidePost(String postId, bool isHidden) async {
+    if (_currentUser == null) return false;
+    try {
+      await _postService.toggleHidePost(postId, isHidden);
+      await loadUserProfile();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Lỗi ẩn bài: $e';
+      notifyListeners();
+      return false;
     }
   }
 

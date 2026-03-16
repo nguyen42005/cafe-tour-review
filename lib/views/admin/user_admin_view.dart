@@ -104,11 +104,7 @@ class _UserAdminViewState extends State<UserAdminView> {
               return UserAdminCard(
                 user: user,
                 onToggleRole: () => _toggleRole(context, user, viewModel),
-                onBlock: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Tính năng đang phát triển')),
-                  );
-                },
+                onBlock: () => _toggleBlock(context, user, viewModel),
               );
             },
           );
@@ -143,6 +139,47 @@ class _UserAdminViewState extends State<UserAdminView> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Đã cập nhật vai trò thành công'),
+                  ),
+                );
+              }
+            },
+            child: const Text('Đồng ý'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _toggleBlock(
+    BuildContext context,
+    UserModel user,
+    UserAdminViewModel viewModel,
+  ) {
+    final isBlocked = user.isBlocked;
+    final action = isBlocked ? 'mở khóa' : 'khóa';
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Xác nhận $action'),
+        content: Text(
+          'Bạn có chắc chắn muốn $action tài khoản "${user.displayName}"?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final success = await viewModel.toggleBlock(user.id, !isBlocked);
+              if (success && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Đã ${isBlocked ? "mở khóa" : "khóa"} người dùng thành công',
+                    ),
                   ),
                 );
               }

@@ -3,9 +3,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../view_models/profile_view_model.dart';
+import '../../view_models/admin_dashboard_view_model.dart';
 import 'categories_admin_view.dart';
 import 'user_admin_view.dart';
 import 'places_admin_view.dart';
+import 'reports_admin_view.dart';
+import 'content_admin_view.dart';
+import 'notifications_admin_view.dart';
+import 'settings_admin_view.dart';
 import 'widgets/dashboard_admin_widgets.dart';
 // import '../main/main_view.dart'; // Bỏ qua nếu không cần logout ở đây
 
@@ -18,6 +23,16 @@ class DashboardAdminView extends StatefulWidget {
 
 class _DashboardAdminViewState extends State<DashboardAdminView> {
   int _selectedIndex = 0;
+  bool _isInit = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_isInit) {
+      context.read<AdminDashboardViewModel>().loadDashboardData();
+      _isInit = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +64,7 @@ class _DashboardAdminViewState extends State<DashboardAdminView> {
                 child: Column(
                   children: [
                     if (isDesktop) _buildTopBar(),
-                    Expanded(child: _buildMainContent(constraints)),
+                    Expanded(child: _getBody(constraints)),
                   ],
                 ),
               ),
@@ -111,48 +126,16 @@ class _DashboardAdminViewState extends State<DashboardAdminView> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               children: [
                 _buildNavItem(0, Icons.dashboard_outlined, 'Tổng quan'),
+                _buildNavItem(1, Icons.category_outlined, 'Danh mục'),
+                _buildNavItem(2, Icons.location_on_outlined, 'Địa điểm'),
+                _buildNavItem(3, Icons.article_outlined, 'Nội dung'),
+                _buildNavItem(4, Icons.group_outlined, 'Người dùng'),
+                _buildNavItem(5, Icons.report_outlined, 'Báo cáo'),
                 _buildNavItem(
-                  1,
-                  Icons.category_outlined,
-                  'Danh mục',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const CategoriesAdminView(),
-                      ),
-                    );
-                  },
+                  6,
+                  Icons.notifications_none_outlined,
+                  'Thông báo',
                 ),
-                _buildNavItem(
-                  2,
-                  Icons.location_on_outlined,
-                  'Địa điểm',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const PlacesAdminView(),
-                      ),
-                    );
-                  },
-                ),
-                _buildNavItem(3, Icons.description_outlined, 'Nội dung'),
-                _buildNavItem(
-                  4,
-                  Icons.group_outlined,
-                  'Người dùng',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const UserAdminView(),
-                      ),
-                    );
-                  },
-                ),
-                _buildNavItem(5, Icons.bar_chart_outlined, 'Báo cáo'),
-                _buildNavItem(6, Icons.notifications_outlined, 'Thông báo'),
                 _buildNavItem(7, Icons.settings_outlined, 'Cài đặt'),
               ],
             ),
@@ -381,7 +364,32 @@ class _DashboardAdminViewState extends State<DashboardAdminView> {
     );
   }
 
-  Widget _buildMainContent(BoxConstraints constraints) {
+  Widget _getBody(BoxConstraints constraints) {
+    switch (_selectedIndex) {
+      case 0:
+        return _buildDashboardHome(constraints);
+      case 1:
+        return const CategoriesAdminView();
+      case 2:
+        return const PlacesAdminView();
+      case 3:
+        return const ContentAdminView();
+      case 4:
+        return const UserAdminView();
+      case 5:
+        return const ReportsAdminView();
+      case 6:
+        return const NotificationsAdminView();
+      case 7:
+        return const SettingsAdminView();
+      default:
+        return _buildDashboardHome(constraints);
+    }
+  }
+
+  Widget _buildDashboardHome(BoxConstraints constraints) {
+    final adminVM = context.watch<AdminDashboardViewModel>();
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Column(
@@ -404,48 +412,46 @@ class _DashboardAdminViewState extends State<DashboardAdminView> {
                 childAspectRatio: gridConstraints.maxWidth > 600 ? 1.3 : 2.0,
                 children: [
                   _buildStatCard(
-                    'Total Users',
-                    '12,840',
-                    '+12%',
+                    'Người dùng',
+                    adminVM.totalUsers.toString(),
+                    'Tổng số',
                     Icons.person,
                     Colors.green,
                     Colors.green[50]!,
                     const Color(0xFFE8F5E9),
                   ),
                   _buildStatCard(
-                    'New Reviews',
-                    '852',
-                    '+15%',
+                    'Tổng bài đăng',
+                    adminVM.totalPosts.toString(),
+                    'Toàn hệ thống',
                     Icons.rate_review,
                     Colors.blue,
                     Colors.blue[50]!,
                     const Color(0xFFE3F2FD),
                   ),
                   _buildStatCard(
-                    'Total Venues',
-                    '430',
-                    '-2%',
+                    'Địa điểm',
+                    adminVM.totalPlaces.toString(),
+                    'Đã đăng ký',
                     Icons.storefront,
                     Colors.orange,
                     Colors.orange[50]!,
                     const Color(0xFFFFF3E0),
                   ),
                   _buildStatCard(
-                    'Total Comments',
-                    '45.2k',
-                    '+8%',
-                    Icons.favorite,
-                    Colors.purple,
-                    Colors.purple[50]!,
-                    const Color(0xFFF3E5F5),
+                    'Báo cáo chờ',
+                    adminVM.pendingReports.toString(),
+                    'Cần xử lý',
+                    Icons.report_problem,
+                    Colors.red,
+                    Colors.red[50]!,
+                    const Color(0xFFFFEBEE),
                   ),
                 ],
               );
             },
           ),
-
           const SizedBox(height: 32),
-
           LayoutBuilder(
             builder: (context, lowerConstraints) {
               if (lowerConstraints.maxWidth > 1000) {
@@ -692,6 +698,7 @@ class _DashboardAdminViewState extends State<DashboardAdminView> {
   }
 
   Widget _buildGamificationStats() {
+    final adminVM = context.watch<AdminDashboardViewModel>();
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -774,23 +781,29 @@ class _DashboardAdminViewState extends State<DashboardAdminView> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                _buildTopUser(
-                  'https://ui-avatars.com/api/?name=David+K&background=random',
-                  'David K.',
-                  '2,450 pts',
-                ),
-                const SizedBox(height: 16),
-                _buildTopUser(
-                  'https://ui-avatars.com/api/?name=Elena+R&background=random',
-                  'Elena R.',
-                  '1,820 pts',
-                ),
-                const SizedBox(height: 16),
-                _buildTopUser(
-                  'https://ui-avatars.com/api/?name=Tom+B&background=random',
-                  'Tom B.',
-                  '1,400 pts',
-                ),
+                if (adminVM.topContributors.isEmpty)
+                  Center(
+                    child: Text(
+                      'Chưa có dữ liệu',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  )
+                else
+                  ...adminVM.topContributors.map(
+                    (u) => Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _buildTopUser(
+                        u['photoUrl'].isNotEmpty
+                            ? u['photoUrl']
+                            : 'https://ui-avatars.com/api/?name=${u['displayName']}&background=random',
+                        u['displayName'],
+                        '${u['exp']} EXP',
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: 32),
                 Container(
                   padding: const EdgeInsets.all(16),

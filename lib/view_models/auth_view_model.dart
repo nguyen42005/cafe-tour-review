@@ -106,6 +106,8 @@ class AuthViewModel extends ChangeNotifier {
           following: 0,
           placesVisited: 0,
           postsCount: 0,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
         );
         await UserService().saveUser(newUser);
       }
@@ -141,5 +143,12 @@ class AuthViewModel extends ChangeNotifier {
   // Logic Google Login
   Future<void> loginWithGoogle() async {
     // Implement Google Auth logic here
+  }
+
+  // Logic Đăng xuất
+  Future<void> logout() async {
+    await _authService.signOut();
+    _user = null;
+    notifyListeners();
   }
 }
