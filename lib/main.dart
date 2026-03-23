@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'firebase_options.dart';
 import 'core/theme/app_colors.dart';
+import 'view_models/admin_dashboard_view_model.dart';
 import 'view_models/auth_view_model.dart';
 import 'view_models/splash_view_model.dart';
 import 'view_models/create_post_view_model.dart';
@@ -11,12 +12,14 @@ import 'view_models/profile_view_model.dart';
 import 'view_models/category_view_model.dart';
 import 'view_models/user_admin_view_model.dart';
 import 'view_models/place_view_model.dart';
+import 'view_models/report_view_model.dart';
+import 'view_models/notification_admin_view_model.dart';
 import 'views/splash/splash_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  GoogleFonts.config.allowRuntimeFetching = false;
+  GoogleFonts.config.allowRuntimeFetching = true;
 
   runApp(
     MultiProvider(
@@ -27,6 +30,9 @@ void main() async {
         ChangeNotifierProvider(create: (_) => ProfileViewModel()),
         ChangeNotifierProvider(create: (_) => CategoryViewModel()),
         ChangeNotifierProvider(create: (_) => UserAdminViewModel()),
+        ChangeNotifierProvider(create: (_) => AdminDashboardViewModel()),
+        ChangeNotifierProvider(create: (_) => ReportViewModel()),
+        ChangeNotifierProvider(create: (_) => NotificationAdminViewModel()),
         ChangeNotifierProvider(create: (_) => PlaceViewModel()),
       ],
       child: const MyApp(),
